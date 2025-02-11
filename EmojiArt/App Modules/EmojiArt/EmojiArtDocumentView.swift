@@ -12,13 +12,12 @@ struct EmojiArtDocumentView: View {
     
     @ObservedObject var document: EmojiArtDocument
     
-    private let emojis = "🐞🍄🌹💄🧶🦺🍁🥐🍺👑🐝🌽🧀🎷🚜🦚🦜🌴🥑🔫🧵👗🦋🦕🐬🤰🦄🪻🍇🧬👙🦩🌺🩰💒"
     private let paletteEmojiSize: CGFloat = 40
     
     var body: some View {
         VStack(spacing: 0) {
             documentBody
-            ScrollingEmojis(emojis)
+            PaletteChooser()
                 .font(.system(size: paletteEmojiSize))
                 .padding(.horizontal)
                 .scrollIndicators(.hidden)
@@ -37,6 +36,17 @@ struct EmojiArtDocumentView: View {
             .dropDestination(for: Sturldata.self) { items, location in
                 drop(items, at: location, in: geometry)
             }
+        }
+    }
+    
+    @ViewBuilder
+    private func documentContents(in geometry: GeometryProxy) -> some View {
+        AsyncImage(url: document.background)
+            .position(Emoji.Position.zero.in(geometry))
+        ForEach(document.emojis) { emoji in
+            Text(emoji.string)
+                .font(emoji.font)
+                .position(emoji.position.in(geometry))
         }
     }
     
@@ -66,19 +76,7 @@ struct EmojiArtDocumentView: View {
             }
     }
     
-    @ViewBuilder
-    private func documentContents(in geometry: GeometryProxy) -> some View {
-        AsyncImage(url: document.background)
-            .position(Emoji.Position.zero.in(geometry))
-        ForEach(document.emojis) { emoji in
-            Text(emoji.string)
-                .font(emoji.font)
-                .position(emoji.position.in(geometry))
-        }
-    }
-    
     private func drop(_ sturldatas: [Sturldata], at location: CGPoint, in geometry: GeometryProxy) -> Bool {
-        
         for strurldata in sturldatas {
             switch strurldata {
             case .url(let url):
@@ -106,25 +104,7 @@ struct EmojiArtDocumentView: View {
     }
 }
 
-struct ScrollingEmojis: View {
-    let emojis: [String]
-    
-    init(_ emojis: String) {
-        self.emojis = emojis.uniqued.map(String.init)
-    }
-    
-    var body: some View {
-        ScrollView(.horizontal) {
-            HStack {
-                ForEach(emojis, id: \.self) { emoji in
-                    Text(emoji)
-                        .draggable(emoji)
-                }
-            }
-        }
-    }
-}
-
 #Preview {
     EmojiArtDocumentView(document: EmojiArtDocument())
+        .environmentObject(PaletteStore(named: "Preview"))
 }
