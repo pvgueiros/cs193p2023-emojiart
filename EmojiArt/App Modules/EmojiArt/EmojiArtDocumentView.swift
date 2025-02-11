@@ -32,6 +32,9 @@ struct EmojiArtDocumentView: View {
                     .scaleEffect(zoom * gestureZoom)
                     .offset(pan + gesturePan)
             }
+            .onTapGesture {
+                deselectAllEmoji()
+            }
             .gesture(panGesture.simultaneously(with: zoomGesture))
             .dropDestination(for: Sturldata.self) { items, location in
                 drop(items, at: location, in: geometry)
@@ -44,11 +47,15 @@ struct EmojiArtDocumentView: View {
         AsyncImage(url: document.background)
             .position(Emoji.Position.zero.in(geometry))
         ForEach(document.emojis) { emoji in
-            Text(emoji.string)
-                .font(emoji.font)
+            EmojiView(emoji, isSelected: isSelected(emoji))
                 .position(emoji.position.in(geometry))
+                .onTapGesture {
+                    toggleSelected(emoji)
+                }
         }
     }
+    
+    // MARK: - User Gestures
     
     @State private var zoom: CGFloat = 1
     @State private var pan: CGOffset = .zero
@@ -76,6 +83,8 @@ struct EmojiArtDocumentView: View {
             }
     }
     
+    // MARK: - Emoji Positioning
+    
     private func drop(_ sturldatas: [Sturldata], at location: CGPoint, in geometry: GeometryProxy) -> Bool {
         for strurldata in sturldatas {
             switch strurldata {
@@ -101,6 +110,26 @@ struct EmojiArtDocumentView: View {
             x: Int((location.x - center.x - pan.width) / zoom),
             y: Int(-(location.y - center.y - pan.height) / zoom)
         )
+    }
+    
+    // MARK: - Selection
+    
+    @State var selectedEmoji = Set<Emoji.ID>()
+    
+    func isSelected(_ emoji: Emoji) -> Bool {
+        selectedEmoji.contains(emoji.id)
+    }
+    
+    func toggleSelected(_ emoji: Emoji) {
+        if isSelected(emoji) {
+            selectedEmoji.remove(emoji.id)
+        } else {
+            selectedEmoji.insert(emoji.id)
+        }
+    }
+    
+    func deselectAllEmoji() {
+        selectedEmoji.removeAll()
     }
 }
 
