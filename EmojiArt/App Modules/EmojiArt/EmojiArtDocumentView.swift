@@ -29,13 +29,13 @@ struct EmojiArtDocumentView: View {
             ZStack {
                 Color.white
                 documentContents(in: geometry)
-                    .scaleEffect(zoom * gestureZoom)
+                    .scaleEffect(zoom * gestureZoomDocument)
                     .offset(pan + gesturePan)
             }
             .onTapGesture {
                 deselectAllEmoji()
             }
-            .gesture(panGesture.simultaneously(with: zoomGesture))
+            .gesture(documentPanGesture.simultaneously(with: zoomGesture))
             .dropDestination(for: Sturldata.self) { items, location in
                 drop(items, at: location, in: geometry)
             }
@@ -49,6 +49,7 @@ struct EmojiArtDocumentView: View {
         ForEach(document.emojis) { emoji in
             EmojiView(emoji, isSelected: isSelected(emoji))
                 .position(emoji.position.in(geometry))
+                .scaleEffect(selectedEmoji.contains(emoji.id) ? gestureZoomSelectedEmoji : 1)
                 .onTapGesture {
                     toggleSelected(emoji)
                 }
@@ -58,22 +59,30 @@ struct EmojiArtDocumentView: View {
     // MARK: - User Gestures
     
     @State private var zoom: CGFloat = 1
-    @State private var pan: CGOffset = .zero
+    @GestureState private var gestureZoomDocument: CGFloat = 1
+    @GestureState private var gestureZoomSelectedEmoji: CGFloat = 1
     
-    @GestureState private var gestureZoom: CGFloat = 1
+    @State private var pan: CGOffset = .zero
     @GestureState private var gesturePan: CGOffset = .zero
     
     private var zoomGesture: some Gesture {
-        MagnificationGesture()
-            .updating($gestureZoom, body: { inMotionPinchScale, gestureZoom, _ in
-                gestureZoom = inMotionPinchScale
+        let objectGestureZoom = selectedEmoji.isEmpty ? $gestureZoomDocument : $gestureZoomSelectedEmoji
+        
+        return MagnificationGesture()
+            .updating(objectGestureZoom, body: { inMotionPinchScale, objectGestureZoom, _ in
+                objectGestureZoom = inMotionPinchScale
             })
             .onEnded { endingPinchScale in
-                zoom *= endingPinchScale
+                if selectedEmoji.isEmpty { zoom *= endingPinchScale }
+                else {
+                    for emojiID in selectedEmoji {
+                        document.resize(emojiWithId: emojiID, by: endingPinchScale)
+                    }
+                }
             }
     }
                      
-    private var panGesture: some Gesture {
+    private var documentPanGesture: some Gesture {
         DragGesture()
             .updating($gesturePan, body: { inMotionDragOffset, gesturePan, _ in
                 gesturePan = inMotionDragOffset.translation
@@ -116,16 +125,16 @@ struct EmojiArtDocumentView: View {
     
     @State var selectedEmoji = Set<Emoji.ID>()
     
-    func isSelected(_ emoji: Emoji) -> Bool {
-        selectedEmoji.contains(emoji.id)
-    }
-    
     func toggleSelected(_ emoji: Emoji) {
         if isSelected(emoji) {
             selectedEmoji.remove(emoji.id)
         } else {
             selectedEmoji.insert(emoji.id)
         }
+    }
+    
+    func isSelected(_ emoji: Emoji) -> Bool {
+        selectedEmoji.contains(emoji.id)
     }
     
     func deselectAllEmoji() {

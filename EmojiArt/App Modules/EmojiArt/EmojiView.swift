@@ -12,7 +12,7 @@ struct EmojiView: View {
     
     struct Constant {
         static let padding: CGFloat = 5
-        static let selectionWidth: CGFloat = 5
+        static let selectionWidth: CGFloat = 3
         static let selectionColor: Color = .blue
     }
     
