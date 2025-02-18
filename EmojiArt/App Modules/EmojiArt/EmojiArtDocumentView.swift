@@ -47,9 +47,9 @@ struct EmojiArtDocumentView: View {
         AsyncImage(url: document.background)
             .position(Emoji.Position.zero.in(geometry))
         ForEach(document.emojis) { emoji in
-            EmojiView(emoji, isSelected: isSelected(emoji))
-                .position(emoji.position.in(geometry))
+            EmojiView(emoji, isSelected: isSelected(emoji), zoomInProgress: emojiZoomInProgress)
                 .scaleEffect(selectedEmoji.contains(emoji.id) ? gestureZoomSelectedEmoji : 1)
+                .position(emoji.position.in(geometry))
                 .onTapGesture {
                     toggleSelected(emoji)
                 }
@@ -60,6 +60,8 @@ struct EmojiArtDocumentView: View {
     
     @State private var zoom: CGFloat = 1
     @GestureState private var gestureZoomDocument: CGFloat = 1
+    
+    @State private var emojiZoomInProgress: Bool = false
     @GestureState private var gestureZoomSelectedEmoji: CGFloat = 1
     
     @State private var pan: CGOffset = .zero
@@ -70,11 +72,13 @@ struct EmojiArtDocumentView: View {
         
         return MagnificationGesture()
             .updating(objectGestureZoom, body: { inMotionPinchScale, objectGestureZoom, _ in
+                emojiZoomInProgress = true
                 objectGestureZoom = inMotionPinchScale
             })
             .onEnded { endingPinchScale in
                 if selectedEmoji.isEmpty { zoom *= endingPinchScale }
                 else {
+                    emojiZoomInProgress = false
                     for emojiID in selectedEmoji {
                         document.resize(emojiWithId: emojiID, by: endingPinchScale)
                     }

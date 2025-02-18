@@ -18,17 +18,21 @@ struct EmojiView: View {
     
     let emoji: Emoji
     let isSelected: Bool
+    let zoomInProgress: Bool
     
-    init(_ emoji: Emoji, isSelected: Bool) {
+    init(_ emoji: Emoji, isSelected: Bool, zoomInProgress: Bool = false) {
         self.emoji = emoji
         self.isSelected = isSelected
+        self.zoomInProgress = zoomInProgress
     }
     
     var body: some View {
         Text(emoji.string)
             .font(emoji.font)
             .padding(Constant.padding)
-            .border(isSelected ? Constant.selectionColor : .clear,
+            .border(zoomInProgress ? .clear :
+                        isSelected ? Constant.selectionColor :
+                            .clear,
                     width: Constant.selectionWidth)
     }
 }
