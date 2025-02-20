@@ -58,6 +58,12 @@ class EmojiArtDocument: ObservableObject {
             resize(emoji, by: scale)
         }
     }
+    
+    func deleteAllEmoji(_ emojiIDs: Set<Emoji.ID>) {
+        for id in emojiIDs {
+            emojiArt.deleteEmoji(id: id)
+        }
+    }
 }
 
 extension EmojiArt.Emoji {

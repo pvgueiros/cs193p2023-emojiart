@@ -8,7 +8,7 @@
 import Foundation
 
 struct EmojiArt {
-    struct Emoji: Identifiable {
+    struct Emoji: Identifiable, Equatable {
         let string: String
         var position: Position
         var size: Int
@@ -19,6 +19,10 @@ struct EmojiArt {
             var y: Int
             
             static let zero = Self(x: 0, y: 0)
+        }
+        
+        static func == (lhs: EmojiArt.Emoji, rhs: EmojiArt.Emoji) -> Bool {
+            lhs.id == rhs.id
         }
     }
     
@@ -35,6 +39,10 @@ struct EmojiArt {
             size: size,
             id: uniqueEmojiId
         ))
+    }
+    
+    mutating func deleteEmoji(id: Emoji.ID) {
+        emojis.removeAll { $0.id == id }
     }
     
     subscript(_ emojiId: Emoji.ID) -> Emoji? {
