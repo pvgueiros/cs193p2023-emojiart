@@ -10,11 +10,15 @@ import SwiftUI
 struct EmojiArtDocumentView: View {
     typealias Emoji = EmojiArt.Emoji
     
+    // MARK: - Properties
+    
     @ObservedObject var document: EmojiArtDocument
     
     private let paletteEmojiSize: CGFloat = 40
     private let deleteButtonTitleSize: CGFloat = 24
     private let defaultInset: CGFloat = 10
+    
+    // MARK: - Views
     
     var body: some View {
         VStack(spacing: defaultInset) {
