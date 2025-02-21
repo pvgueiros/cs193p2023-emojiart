@@ -19,13 +19,8 @@ struct EmojiArtDocumentView: View {
     var body: some View {
         VStack(spacing: defaultInset) {
             documentBody
-            if !selectedEmojiIDs.isEmpty {
-                deleteSelectedView
-            }
-            PaletteChooser()
-                .font(.system(size: paletteEmojiSize))
-                .padding(.horizontal)
-                .scrollIndicators(.hidden)
+            deleteView
+            paletteView
         }
         .onChange(of: document.emojis) { oldValue, newValue in
             cleanUpSelection(newValue)
@@ -38,7 +33,7 @@ struct EmojiArtDocumentView: View {
                 Color.white
                 documentContents(in: geometry)
                     .scaleEffect(zoom * gestureZoomDocument)
-                    .offset(pan + gesturePan)
+                    .offset(pan + gesturePanDocument)
             }
             .onTapGesture {
                 deselectAllEmoji()
@@ -56,85 +51,109 @@ struct EmojiArtDocumentView: View {
             .position(Emoji.Position.zero.in(geometry))
         ForEach(document.emojis) { emoji in
             EmojiView(emoji, isSelected: isSelected(emoji), gestureInProgress: gestureInProgress)
-                .scaleEffect(selectedEmojiIDs.contains(emoji.id) ? gestureZoomSelectedEmoji : 1)
+                .scaleEffect(scaleEffectFor(emoji))
                 .position(emoji.position.in(geometry))
-                .offset(selectedEmojiIDs.contains(emoji.id) ? gesturePanSelectedEmoji : .zero)
-                .gesture(emojiPanGesture)
+                .offset(offsetFor(emoji))
+                .gesture(panGestureFor(emoji))
                 .onTapGesture {
                     toggleSelected(emoji)
                 }
         }
     }
     
-    private var deleteSelectedView: some View {
+    private var deleteView: some View {
         HStack {
             Spacer()
             Button(role: .destructive) {
-                document.deleteAllEmoji(selectedEmojiIDs)
+                document.deleteAll(emojisWithIdIn: selectedEmojiIds)
             } label: {
                 HStack {
-                    Image(systemName: "trash").foregroundColor(.red)
-                    Text("Delete selected (\(selectedEmojiIDs.count))")
+                    Image(systemName: "trash")
+                    Text("Delete (\(selectedEmojiIds.count))")
                 }
             }
+            .padding(defaultInset)
+            .background(.white)
+            .cornerRadius(.infinity)
+            .opacity(selectedEmojiIds.isEmpty ? 0 : 1)
         }
         .font(.system(size: deleteButtonTitleSize))
         .padding(.horizontal)
     }
     
+    private var paletteView: some View {
+        PaletteChooser()
+            .font(.system(size: paletteEmojiSize))
+            .padding(.horizontal)
+            .scrollIndicators(.hidden)
+    }
+    
     // MARK: - User Gestures
+    
+    @State private var gestureInProgress: Bool = false
     
     @State private var zoom: CGFloat = 1
     @GestureState private var gestureZoomDocument: CGFloat = 1
     @GestureState private var gestureZoomSelectedEmoji: CGFloat = 1
     
-    @State private var pan: CGOffset = .zero
-    @GestureState private var gesturePan: CGOffset = .zero
-    @GestureState private var gesturePanSelectedEmoji: CGOffset = .zero
-    
-    @State private var gestureInProgress: Bool = false
-    
     private var zoomGesture: some Gesture {
-        let objectGestureZoom = selectedEmojiIDs.isEmpty ? $gestureZoomDocument : $gestureZoomSelectedEmoji
+        let objectGestureZoom = selectedEmojiIds.isEmpty ? $gestureZoomDocument : $gestureZoomSelectedEmoji
         
         return MagnificationGesture()
-            .updating(objectGestureZoom, body: { inMotionPinchScale, objectGestureZoom, _ in
+            .updating(objectGestureZoom) { inMotionPinchScale, objectGestureZoom, _ in
                 gestureInProgress = true
                 objectGestureZoom = inMotionPinchScale
-            })
+            }
             .onEnded { endingPinchScale in
                 gestureInProgress = false
-                if selectedEmojiIDs.isEmpty { zoom *= endingPinchScale }
+                
+                if selectedEmojiIds.isEmpty { zoom *= endingPinchScale }
                 else {
-                    for emojiID in selectedEmojiIDs {
-                        document.resize(emojiWithId: emojiID, by: endingPinchScale)
-                    }
+                    document.resizeAll(emojisWithIdIn: selectedEmojiIds, by: endingPinchScale)
                 }
             }
     }
+    
+    @State private var pan: CGOffset = .zero
+    @GestureState private var gesturePanDocument: CGOffset = .zero
                      
     private var documentPanGesture: some Gesture {
         DragGesture()
-            .updating($gesturePan, body: { inMotionDragOffset, gesturePan, _ in
+            .updating($gesturePanDocument) { inMotionDragOffset, gesturePanDocument, _ in
                 gestureInProgress = true
-                gesturePan = inMotionDragOffset.translation
-            })
+                gesturePanDocument = inMotionDragOffset.translation
+            }
             .onEnded { dragOffset in
                 gestureInProgress = false
                 pan += dragOffset.translation
             }
     }
     
-    private var emojiPanGesture: some Gesture {
-        DragGesture()
-            .updating($gesturePanSelectedEmoji, body: { inMotionDragOffset, gesturePanSelectedEmoji, _ in
+    @GestureState private var gesturePanSelectedEmoji: CGOffset = .zero
+    @GestureState private var gesturePanSingleEmoji: CGOffset = .zero
+    
+    @State private var singleEmojiBeingDraggedId: Emoji.ID? = nil
+    private var isDraggingSingleEmoji: Bool { singleEmojiBeingDraggedId != nil }
+    
+    private func panGestureFor(_ emoji: Emoji) -> some Gesture {
+        let objectGesturePan = selectedEmojiIds.contains(emoji.id)
+            ? $gesturePanSelectedEmoji
+            : $gesturePanSingleEmoji
+        
+        return DragGesture()
+            .updating(objectGesturePan) { inMotionDragOffset, objectGesturePan, _ in
                 gestureInProgress = true
-                gesturePanSelectedEmoji = inMotionDragOffset.translation
-            })
+                singleEmojiBeingDraggedId = selectedEmojiIds.contains(emoji.id) ? nil : emoji.id
+                objectGesturePan = inMotionDragOffset.translation
+            }
             .onEnded { dragOffset in
                 gestureInProgress = false
-                for emojiID in selectedEmojiIDs {
-                    document.move(emojiWithId: emojiID, by: dragOffset.translation)
+                
+                if isDraggingSingleEmoji {
+                    document.move(emoji, by: dragOffset.translation)
+                    singleEmojiBeingDraggedId = nil
+                } else {
+                    document.moveAll(emojisWithIdIn: selectedEmojiIds, by: dragOffset.translation)
                 }
             }
     }
@@ -168,29 +187,39 @@ struct EmojiArtDocumentView: View {
         )
     }
     
+    private func offsetFor(_ emoji: Emoji) -> CGOffset {
+        if selectedEmojiIds.contains(emoji.id) { return gesturePanSelectedEmoji }
+        if singleEmojiBeingDraggedId == emoji.id { return gesturePanSingleEmoji }
+        return .zero
+    }
+    
+    private func scaleEffectFor(_ emoji: Emoji) -> CGFloat {
+        selectedEmojiIds.contains(emoji.id) ? gestureZoomSelectedEmoji : 1
+    }
+    
     // MARK: - Selection
     
-    @State var selectedEmojiIDs = Set<Emoji.ID>()
+    @State var selectedEmojiIds = Set<Emoji.ID>()
     
     private func toggleSelected(_ emoji: Emoji) {
         if isSelected(emoji) {
-            selectedEmojiIDs.remove(emoji.id)
+            selectedEmojiIds.remove(emoji.id)
         } else {
-            selectedEmojiIDs.insert(emoji.id)
+            selectedEmojiIds.insert(emoji.id)
         }
     }
     
     private func isSelected(_ emoji: Emoji) -> Bool {
-        selectedEmojiIDs.contains(emoji.id)
+        selectedEmojiIds.contains(emoji.id)
     }
     
     private func deselectAllEmoji() {
-        selectedEmojiIDs.removeAll()
+        selectedEmojiIds.removeAll()
     }
     
     private func cleanUpSelection(_ updatedEmojis: [Emoji]) {
-        let existingIDs = Set(updatedEmojis.map { $0.id })
-        selectedEmojiIDs.formIntersection(existingIDs)
+        let existingIds = Set(updatedEmojis.map { $0.id })
+        selectedEmojiIds.formIntersection(existingIds)
     }
 }
 

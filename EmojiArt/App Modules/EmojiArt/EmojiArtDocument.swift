@@ -49,6 +49,12 @@ class EmojiArtDocument: ObservableObject {
         }
     }
     
+    func moveAll(emojisWithIdIn emojiIds: Set<Emoji.ID>, by offset: CGOffset) {
+        for id in emojiIds {
+            move(emojiWithId: id, by: offset)
+        }
+    }
+    
     func resize(_ emoji: Emoji, by scale: CGFloat) {
         emojiArt[emoji].size = Int(CGFloat(emojiArt[emoji].size) * scale)
     }
@@ -59,8 +65,14 @@ class EmojiArtDocument: ObservableObject {
         }
     }
     
-    func deleteAllEmoji(_ emojiIDs: Set<Emoji.ID>) {
-        for id in emojiIDs {
+    func resizeAll(emojisWithIdIn emojiIds: Set<Emoji.ID>, by scale: CGFloat) {
+        for id in emojiIds {
+            resize(emojiWithId: id, by: scale)
+        }
+    }
+    
+    func deleteAll(emojisWithIdIn emojiIds: Set<Emoji.ID>) {
+        for id in emojiIds {
             emojiArt.deleteEmoji(id: id)
         }
     }
