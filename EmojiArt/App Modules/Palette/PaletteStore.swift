@@ -8,24 +8,38 @@
 import Foundation
 
 class PaletteStore: ObservableObject {
+    
+    // MARK: - Properties
+    
     let name: String
     
-    @Published var palettes: [Palette] = [] {
-        didSet {
-            if palettes.isEmpty && !oldValue.isEmpty {
-                palettes = oldValue
+    private var userDefaultsKey: String { "PaletteStore:" + name }
+    
+    var palettes: [Palette] {
+        get {
+            UserDefaults.standard.palettes(forKey: userDefaultsKey)
+        }
+        set {
+            if !newValue.isEmpty {
+                UserDefaults.standard.set(newValue, forKey: userDefaultsKey)
+                objectWillChange.send() // alternative to @Published, since we are using computed property
             }
         }
     }
     
+    // MARK: - Initialization
+    
     init(named name: String) {
         self.name = name
-        palettes = Palette.builtins
-        
         if palettes.isEmpty {
-            palettes = [Palette(name: "Warning", emojis: "⚠️")]
+            palettes = Palette.builtins
+            if palettes.isEmpty {
+                palettes = [Palette(name: "Warning", emojis: "⚠️")]
+            }
         }
     }
+    
+    // MARK: - Adding Palettes
     
     @Published private var _cursorIndex = 0
     
@@ -41,8 +55,6 @@ class PaletteStore: ObservableObject {
         }
         return index
     }
-    
-    // MARK: - Adding Palettes
     
     // these functions are the recommended way to add Palettes to the PaletteStore
     // since they try to avoid duplication of Identifiable-ly identical Palettes
@@ -78,5 +90,23 @@ class PaletteStore: ObservableObject {
     
     func append(name: String, emojis: String) {
         append(Palette(name: name, emojis: emojis))
+    }
+}
+
+// MARK: - Persistance
+
+extension UserDefaults {
+    func palettes(forKey key: String) -> [Palette] {
+        if let jsonData = data(forKey: key),
+           let decodedPalettes = try? JSONDecoder().decode([Palette].self, from: jsonData) {
+            return decodedPalettes
+        } else {
+            return []
+        }
+    }
+    
+    func set(_ palettes: [Palette], forKey key: String) {
+        let data = try? JSONEncoder().encode(palettes)
+        set(data, forKey: key)
     }
 }

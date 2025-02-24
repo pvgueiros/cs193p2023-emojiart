@@ -8,9 +8,16 @@
 import SwiftUI
 
 class EmojiArtDocument: ObservableObject {
+    
+    // MARK: - Properties
+    
     typealias Emoji = EmojiArt.Emoji
     
-    @Published private var emojiArt = EmojiArt()
+    @Published private var emojiArt = EmojiArt() {
+        didSet {
+            autoSave()
+        }
+    }
     
     var emojis: [Emoji] {
         emojiArt.emojis
@@ -20,9 +27,31 @@ class EmojiArtDocument: ObservableObject {
         emojiArt.background
     }
     
+    // MARK: - Initialization
+    
     init() {
-        emojiArt.addEmoji("👑", at: .init(x: 0, y: 0), size: 100)
-        emojiArt.addEmoji("🍄", at: .init(x: 120, y: 150), size: 75)
+        if let data = try? Data(contentsOf: autosaveURL),
+           let autosavedEmojiArt = try? EmojiArt(json: data) {
+            emojiArt = autosavedEmojiArt
+        }
+    }
+    
+    // MARK: - Persistence
+    
+    private let autosaveURL: URL = URL.documentsDirectory.appendingPathComponent("Autosaved.emojiart")
+    
+    private func autoSave() {
+        save(to: autosaveURL)
+        print("autosaved to \(autosaveURL)")
+    }
+    
+    private func save(to url: URL) {
+        do {
+            let data = try emojiArt.json()
+            try data.write(to: url)
+        } catch {
+            print("EmojiArtDocument: Failed to save to \(url): \(error)")
+        }
     }
     
     // MARK: - Intent
