@@ -11,11 +11,14 @@ import SwiftUI
 struct EmojiArtApp: App {
     @StateObject var defaultDocument = EmojiArtDocument()
     @StateObject var paletteStore = PaletteStore(named: "Main")
+    @StateObject var paletteStore2 = PaletteStore(named: "Alternate")
+    @StateObject var paletteStore3 = PaletteStore(named: "Special")
     
     var body: some Scene {
         WindowGroup {
-            EmojiArtDocumentView(document: defaultDocument)
-                .environmentObject(paletteStore)
+//            EmojiArtDocumentView(document: defaultDocument)
+//                .environmentObject(paletteStore)
+            PaletteManager(stores: [paletteStore, paletteStore2, paletteStore3])
         }
     }
 }

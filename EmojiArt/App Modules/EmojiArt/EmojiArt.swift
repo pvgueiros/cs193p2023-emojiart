@@ -51,7 +51,7 @@ struct EmojiArt: Codable {
         return encoded
     }
     
-    // MARK: - Modification
+    // MARK: - Emoji Editing
     
     mutating func addEmoji(_ emoji: String, at position: Emoji.Position, size: Int) {
         uniqueEmojiId += 1
