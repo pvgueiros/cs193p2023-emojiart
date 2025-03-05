@@ -18,6 +18,7 @@ struct PaletteManager: View {
                 PaletteStoreView(store: store)
                     .tag(store)
             }
+            .navigationTitle("Manager")
         } content: {
             if let selectedStore {
                 EditablePaletteList(store: selectedStore)
