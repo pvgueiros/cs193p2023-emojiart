@@ -17,6 +17,8 @@ struct EmojiArtDocumentView: View {
     private let paletteEmojiSize: CGFloat = 40
     private let deleteButtonTitleSize: CGFloat = 24
     private let defaultInset: CGFloat = 10
+    private let progressViewScale: CGFloat = 2
+    private let progressViewColor: Color = .blue
     
     // MARK: - Views
     
@@ -31,38 +33,59 @@ struct EmojiArtDocumentView: View {
         }
     }
     
+    @State private var showBackgroundFailureAlert: Bool = false
+    
     private var documentBody: some View {
         GeometryReader { geometry in
-            ZStack {
-                Color.white
-                documentContents(in: geometry)
-                    .scaleEffect(zoom * gestureZoomDocument)
-                    .offset(pan + gesturePanDocument)
-            }
+            
+            documentBodyView(in: geometry)
             .onTapGesture {
                 deselectAllEmoji()
+            }
+            .onTapGesture(count: 2) {
+                zoomToFit(document.bbox, in: geometry)
             }
             .gesture(documentPanGesture.simultaneously(with: zoomGesture))
             .dropDestination(for: Sturldata.self) { items, location in
                 drop(items, at: location, in: geometry)
             }
+            .onChange(of: document.background.failureReason, { _, reason in
+                showBackgroundFailureAlert = (reason != nil)
+            })
+            .onChange(of: document.background.uiImage, { _, image in
+                zoomToFit(image?.size, in: geometry)
+            })
+            .alert(
+                "Set Background",
+                isPresented: $showBackgroundFailureAlert,
+                presenting: document.background.failureReason,
+                actions: { reason in Button("OK", role: .cancel) {} },
+                message: { reason in Text(reason) }
+            )
+        }
+    }
+    
+    private func documentBodyView(in geometry: GeometryProxy) -> some View {
+        ZStack {
+            Color.white
+            if document.background.isFetching {
+                ProgressView()
+                    .scaleEffect(progressViewScale)
+                    .tint(progressViewColor)
+                    .position(Emoji.Position.zero.in(geometry))
+            }
+            documentContents(in: geometry)
+                .scaleEffect(zoom * gestureZoomDocument)
+                .offset(pan + gesturePanDocument)
         }
     }
     
     @ViewBuilder
     private func documentContents(in geometry: GeometryProxy) -> some View {
-        AsyncImage(url: document.background) { phase in
-            if let image = phase.image {
-                image
-            } else if let url = document.background {
-                if phase.error != nil {
-                    Text("\(url)")
-                } else {
-                    ProgressView()
-                }
-            }
+        if let uiimage = document.background.uiImage {
+            Image(uiImage: uiimage)
+                .position(Emoji.Position.zero.in(geometry))
         }
-        .position(Emoji.Position.zero.in(geometry))
         
         ForEach(document.emojis) { emoji in
             EmojiView(emoji, isSelected: isSelected(emoji), gestureInProgress: gestureInProgress)
@@ -171,6 +194,23 @@ struct EmojiArtDocumentView: View {
                     document.moveAll(emojisWithIdIn: selectedEmojiIds, by: dragOffset.translation)
                 }
             }
+    }
+    
+    private func zoomToFit(_ size: CGSize?, in geometry: GeometryProxy) {
+        if let size {
+            zoomToFit(CGRect(center: .zero, size: size), in: geometry)
+        }
+    }
+    
+    private func zoomToFit(_ rect: CGRect, in geometry: GeometryProxy) {
+        withAnimation {
+            if rect.size.width > 0, rect.size.height > 0, geometry.size.height > 0, geometry.size.width > 0 {
+                let hZoom = geometry.size.width / rect.size.width
+                let vZoom = geometry.size.height / rect.size.height
+                zoom = min(hZoom, vZoom)
+                pan = CGOffset(width: -rect.midX * zoom, height: -rect.midY * zoom)
+            }
+        }
     }
     
     // MARK: - Emoji Positioning

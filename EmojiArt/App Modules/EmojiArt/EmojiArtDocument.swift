@@ -7,6 +7,7 @@
 
 import SwiftUI
 
+@MainActor
 class EmojiArtDocument: ObservableObject {
     
     // MARK: - Properties
@@ -16,6 +17,11 @@ class EmojiArtDocument: ObservableObject {
     @Published private var emojiArt = EmojiArt() {
         didSet {
             autoSave()
+            if emojiArt.background != oldValue.background {
+                Task {
+                    await fetchBackgroundImage()
+                }
+            }
         }
     }
     
@@ -23,8 +29,15 @@ class EmojiArtDocument: ObservableObject {
         emojiArt.emojis
     }
     
-    var background: URL? {
-        emojiArt.background
+    var bbox: CGRect {
+        var bbox = CGRect.zero
+        for emoji in emojiArt.emojis {
+            bbox = bbox.union(emoji.bbox)
+        }
+        if let backgroundSize = background.uiImage?.size {
+            bbox = bbox.union(CGRect(center: .zero, size: backgroundSize))
+        }
+        return bbox
     }
     
     // MARK: - Initialization
@@ -52,6 +65,71 @@ class EmojiArtDocument: ObservableObject {
         } catch {
             print("EmojiArtDocument: Failed to save to \(url): \(error)")
         }
+    }
+    
+    // MARK: - Background Image
+    
+    @Published var background: Background = .none
+    
+    enum Background {
+        case none
+        case fetching(URL)
+        case found(UIImage)
+        case failed(String)
+        
+        var urlBeingFetched: URL? {
+            switch self {
+            case .fetching(let url): return url
+            default: return nil
+            }
+        }
+        
+        var isFetching: Bool { urlBeingFetched != nil }
+        
+        var uiImage: UIImage? {
+            switch self {
+            case .found(let uiImage): return uiImage
+            default: return nil
+            }
+        }
+        
+        var failureReason: String? {
+            switch self {
+            case .failed(let reason): return reason
+            default: return nil
+            }
+        }
+    }
+    
+    private func fetchBackgroundImage() async {
+        if let url = emojiArt.background {
+            background = .fetching(url)
+            do {
+                let image = try await fetchUIImage(from: url)
+                if url == emojiArt.background {
+                    background = .found(image)
+                }
+            } catch {
+                if url == emojiArt.background {
+                    background = .failed("Couldn't set background image: \(error.localizedDescription)")
+                }
+            }
+        } else {
+            background = .none
+        }
+    }
+    
+    private func fetchUIImage(from url: URL) async throws -> UIImage {
+        let (data, _) = try await URLSession.shared.data(from: url)
+        if let uiImage = UIImage(data: data) {
+            return uiImage
+        } else {
+            throw FetchError.badImageData
+        }
+    }
+    
+    enum FetchError: Error {
+        case badImageData
     }
     
     // MARK: - Intent
@@ -111,11 +189,15 @@ extension EmojiArt.Emoji {
     var font: Font {
         .system(size: CGFloat(size))
     }
+    
+    var bbox: CGRect {
+        CGRect(center: position.in(nil), size: CGSize(width: CGFloat(size), height: CGFloat(size)))
+    }
 }
 
 extension EmojiArt.Emoji.Position {
-    func `in`(_ geometry: GeometryProxy) -> CGPoint {
-        let center = geometry.frame(in: .local).center
+    func `in`(_ geometry: GeometryProxy?) -> CGPoint {
+        let center = geometry?.frame(in: .local).center ?? .zero
         return CGPoint(x: center.x + CGFloat(x), y: center.y - CGFloat(y))
     }
 }
